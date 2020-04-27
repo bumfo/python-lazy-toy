@@ -1,4 +1,22 @@
 class Lazy:
+  def __eq__(self, o):
+    return Eq(self, o)
+
+  def __ne__(self, o):
+    return Ne(self, o)
+
+  def __lt__(self, o):
+    return Lt(self, o)
+
+  def __le__(self, o):
+    return Le(self, o)
+
+  def __gt__(self, o):
+    return Gt(self, o)
+
+  def __ge__(self, o):
+    return Ge(self, o)
+
   def __add__(self, o):
     return Add(self, o)
 
@@ -69,6 +87,98 @@ class Call(Lazy):
 
   def eval(self, **kwargs):
     return evaluate(partial_evaluate(self.callable, **self.kwargs), **kwargs)
+
+
+class If(Lazy):
+  def __init__(self, expr, expr_true, expr_false):
+    super().__init__()
+    self.expr = expr
+    self.expr_true = expr_true
+    self.expr_false = expr_false
+
+  def __str__(self):
+    return f'If({self.expr}, {self.expr_true}, {self.expr_false})'
+
+  def eval(self, **kwargs):
+    return evaluate(self.expr_true, **kwargs) if evaluate(self.expr, **kwargs) else evaluate(self.expr_false, **kwargs)
+
+
+class Eq(Lazy):
+  def __init__(self, a, b):
+    super().__init__()
+    self.a = a
+    self.b = b
+
+  def __str__(self):
+    return f'({self.a} == {self.b})'
+
+  def eval(self, **kwargs):
+    return evaluate(self.a, **kwargs) == evaluate(self.b, **kwargs)
+
+
+class Ne(Lazy):
+  def __init__(self, a, b):
+    super().__init__()
+    self.a = a
+    self.b = b
+
+  def __str__(self):
+    return f'({self.a} != {self.b})'
+
+  def eval(self, **kwargs):
+    return evaluate(self.a, **kwargs) != evaluate(self.b, **kwargs)
+
+
+class Lt(Lazy):
+  def __init__(self, a, b):
+    super().__init__()
+    self.a = a
+    self.b = b
+
+  def __str__(self):
+    return f'({self.a} < {self.b})'
+
+  def eval(self, **kwargs):
+    return evaluate(self.a, **kwargs) < evaluate(self.b, **kwargs)
+
+
+class Le(Lazy):
+  def __init__(self, a, b):
+    super().__init__()
+    self.a = a
+    self.b = b
+
+  def __str__(self):
+    return f'({self.a} <= {self.b})'
+
+  def eval(self, **kwargs):
+    return evaluate(self.a, **kwargs) <= evaluate(self.b, **kwargs)
+
+
+class Gt(Lazy):
+  def __init__(self, a, b):
+    super().__init__()
+    self.a = a
+    self.b = b
+
+  def __str__(self):
+    return f'({self.a} > {self.b})'
+
+  def eval(self, **kwargs):
+    return evaluate(self.a, **kwargs) > evaluate(self.b, **kwargs)
+
+
+class Ge(Lazy):
+  def __init__(self, a, b):
+    super().__init__()
+    self.a = a
+    self.b = b
+
+  def __str__(self):
+    return f'({self.a} >= {self.b})'
+
+  def eval(self, **kwargs):
+    return evaluate(self.a, **kwargs) >= evaluate(self.b, **kwargs)
 
 
 class Add(Lazy):
