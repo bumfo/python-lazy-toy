@@ -23,6 +23,9 @@ class Lazy:
   def __rtruediv__(self, o):
     return TrueDiv(o, self)
 
+  def __call__(self, **kwargs):
+    return Call(self, kwargs)
+
   def eval(self, **kwargs):
     raise NotImplementedError()
 
@@ -35,6 +38,37 @@ def evaluate(o, **kwargs):
     return o.eval(**kwargs)
   else:
     return o
+
+
+def partial_evaluate(o, **kwargs):
+  return evaluate(o, __partial__=True, **kwargs)
+
+
+class Func(Lazy):
+  def __init__(self, name, expr):
+    super().__init__()
+    self.name = name
+    self.expr = expr
+
+  def __str__(self):
+    return f'{self.name}'
+
+  def eval(self, **kwargs):
+    return evaluate(self.expr, **kwargs)
+
+
+class Call(Lazy):
+  def __init__(self, callable, kwargs):
+    super().__init__()
+    self.callable = callable
+    self.kwargs = kwargs
+
+  def __str__(self):
+    str_kwargs = ', '.join(map(lambda x: f'{x[0]}={x[1]}', self.kwargs.items()))
+    return f'{self.callable}({str_kwargs})'
+
+  def eval(self, **kwargs):
+    return evaluate(partial_evaluate(self.callable, **self.kwargs), **kwargs)
 
 
 class Add(Lazy):
@@ -106,6 +140,11 @@ class LazyNoSuchVariableException(Exception):
     super().__init__(message)
 
 
+class LazySelfReference(Exception):
+  def __init__(self, message):
+    super().__init__(message)
+
+
 class Var(Lazy):
   def __init__(self, name):
     super().__init__()
@@ -116,7 +155,10 @@ class Var(Lazy):
 
   def eval(self, __partial__=False, **kwargs):
     try:
-      return evaluate(kwargs[self.name], __partial__=__partial__, **kwargs)
+      val = kwargs[self.name]
+      if val is self:
+        raise LazySelfReference(f'variable self reference on {self.name}')
+      return evaluate(val, __partial__=__partial__, **kwargs)
     except KeyError:
       pass
 
