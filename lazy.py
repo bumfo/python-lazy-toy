@@ -26,6 +26,9 @@ class Lazy:
   def eval(self, **kwargs):
     raise NotImplementedError()
 
+  def partial(self, **kwargs):
+    return self.eval(__partial__=True, **kwargs)
+
 
 def evaluate(o, **kwargs):
   if isinstance(o, Lazy):
@@ -111,8 +114,13 @@ class Var(Lazy):
   def __str__(self):
     return f'{self.name}'
 
-  def eval(self, **kwargs):
+  def eval(self, __partial__=False, **kwargs):
     try:
-      return kwargs[self.name]
+      return evaluate(kwargs[self.name], __partial__=__partial__, **kwargs)
     except KeyError:
+      pass
+
+    if __partial__:
+      return self
+    else:
       raise LazyNoSuchVariableException(f'variable "{self.name}" not found')
