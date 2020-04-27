@@ -116,15 +116,3 @@ class Var(Lazy):
       return kwargs[self.name]
     except KeyError:
       raise LazyNoSuchVariableException(f'variable "{self.name}" not found')
-
-
-def main():
-  x = Var('x')
-  y = 2 + x * 3
-
-  print(y)
-  print(y.eval(x=3))
-
-
-if __name__ == '__main__':
-  main()
