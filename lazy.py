@@ -51,6 +51,22 @@ class Lazy:
     return self.eval(__partial__=True, **kwargs)
 
 
+class NoSuchVariableException(Exception):
+  pass
+
+
+class SelfReferenceException(Exception):
+  pass
+
+
+class NonCallableException(Exception):
+  pass
+
+
+class IllegalStateException(Exception):
+  pass
+
+
 def evaluate(o, **kwargs):
   if isinstance(o, Lazy):
     return o.eval(**kwargs)
@@ -60,6 +76,25 @@ def evaluate(o, **kwargs):
 
 def partial_evaluate(o, **kwargs):
   return evaluate(o, __partial__=True, **kwargs)
+
+
+class Eval(Lazy):
+  def __init__(self, expr, kwargs):
+    super().__init__()
+    self.expr = expr
+    self.kwargs = kwargs
+
+  def __str__(self):
+    str_kwargs = ', '.join(map(lambda x: f'{x[0]}={x[1]}', self.kwargs.items()))
+    return f'Eval({self.expr}, {str_kwargs})'
+
+  def eval(self, __partial__=False, **kwargs):
+    self_kwargs = dict(kwargs)
+
+    for k, v in self.kwargs.items():
+      self_kwargs[k] = evaluate(v, __partial__=__partial__, **kwargs)
+
+    return evaluate(self.expr, __partial__=__partial__, **self_kwargs)
 
 
 class Func(Lazy):
@@ -72,7 +107,16 @@ class Func(Lazy):
     return f'{self.name}'
 
   def eval(self, **kwargs):
-    return evaluate(self.expr, **kwargs)
+    return self
+
+  def eval_call(self, call_kwargs, arg_kwargs, __partial__=False):
+    kwargs = {}
+
+    for k, v in call_kwargs.items():
+      kwargs[k] = evaluate(v, __partial__=__partial__, **arg_kwargs)
+
+    kwargs[self.name] = self
+    return evaluate(self.expr, __partial__=__partial__, **kwargs)
 
 
 class Call(Lazy):
@@ -85,8 +129,18 @@ class Call(Lazy):
     str_kwargs = ', '.join(map(lambda x: f'{x[0]}={x[1]}', self.kwargs.items()))
     return f'{self.callable}({str_kwargs})'
 
-  def eval(self, **kwargs):
-    return evaluate(partial_evaluate(self.callable, **self.kwargs), **kwargs)
+  def eval(self, __partial__=False, **kwargs):
+    f = evaluate(self.callable, __partial__=__partial__, **kwargs)
+
+    if isinstance(f, Func):
+      ret = f.eval_call(self.kwargs, kwargs, __partial__=__partial__)
+    else:
+      if __partial__:
+        return Eval(self, kwargs)
+      else:
+        raise NonCallableException(f'"{f}" is not callable, but {type(f)}')
+
+    return ret
 
 
 class If(Lazy):
@@ -99,8 +153,17 @@ class If(Lazy):
   def __str__(self):
     return f'If({self.expr}, {self.expr_true}, {self.expr_false})'
 
-  def eval(self, **kwargs):
-    return evaluate(self.expr_true, **kwargs) if evaluate(self.expr, **kwargs) else evaluate(self.expr_false, **kwargs)
+  def eval(self, __partial__=False, **kwargs):
+    cond = evaluate(self.expr, __partial__=__partial__, **kwargs)
+    if isinstance(cond, Lazy):
+      if __partial__:
+        return Eval(self, kwargs)
+      else:
+        raise IllegalStateException()
+    if cond:
+      return evaluate(self.expr_true, __partial__=__partial__, **kwargs)
+    else:  
+      return evaluate(self.expr_false, __partial__=__partial__, **kwargs)
 
 
 class Eq(Lazy):
@@ -245,15 +308,6 @@ class Num(Lazy):
     return self.v
 
 
-class LazyNoSuchVariableException(Exception):
-  def __init__(self, message):
-    super().__init__(message)
-
-
-class LazySelfReference(Exception):
-  def __init__(self, message):
-    super().__init__(message)
-
 
 class Var(Lazy):
   def __init__(self, name):
@@ -265,14 +319,14 @@ class Var(Lazy):
 
   def eval(self, __partial__=False, **kwargs):
     try:
-      val = kwargs[self.name]
-      if val is self:
-        raise LazySelfReference(f'variable self reference on {self.name}')
-      return evaluate(val, __partial__=__partial__, **kwargs)
+      v = kwargs[self.name]
+      if isinstance(v, Var) and v.name == self.name:
+        raise SelfReferenceException(f'variable self reference on {self.name}')
+      return evaluate(v, __partial__=__partial__, **kwargs)
     except KeyError:
       pass
 
     if __partial__:
       return self
     else:
-      raise LazyNoSuchVariableException(f'variable "{self.name}" not found')
+      raise NoSuchVariableException(f'variable "{self.name}" not found')

@@ -2,10 +2,14 @@ from lazy import *
 
 def main():
   x = Var('x')
-  y = If(x != 0, 10, 20)
-  print(y)
-  print(y.eval(x=0))
-  print(y.eval(x=1))
+  f = Var('f')
+  f = Func('f', If(x > 1, x * f(x=x - 1), 1))
+
+  print(f(x=5))
+  print(f(x=5).eval())
+  print(f())
+  print(f().partial())
+  print(f().partial().eval(x=5))
 
 
 if __name__ == '__main__':
